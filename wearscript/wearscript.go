@@ -123,13 +123,12 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				conn.channels_external = channels_external
-				// Send to all other connections
-				for _, connSend := range cm.connections {
-					if connSend != conn {
-						conn.SendRaw(dataRaw)
-					}
-				}
 
+			}
+			for _, connSend := range cm.connections {
+				if connSend != conn && connSend.Exists(channel) {
+					conn.SendRaw(dataRaw)
+				}
 			}
 			if cm.channels_internal[channel] != nil {
 				cm.channels_internal[channel](channel, dataRaw, *data)
