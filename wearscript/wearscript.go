@@ -192,7 +192,22 @@ func (cm *ConnectionManager) Publish(channel string, data ...interface{}) {
 }
 
 func (conn *Connection) Exists(channel string) bool {
-	return conn.channels_external[channel] || channel == "subscriptions"
+	if channel == "subscriptions" {
+		return true
+	}
+	splits := strings.Split(channel, ":")
+	channelCur := ""
+	for _, v := range splits {
+		if conn.channels_external[channelCur] {
+			return true
+		}
+		if channelCur == "" {
+			channelCur += v
+		} else {
+			channelCur += ":" + v
+		}
+	}
+	return conn.channels_external[channelCur]
 }
 
 func (cm *ConnectionManager) Channel(parts ...string) string {
