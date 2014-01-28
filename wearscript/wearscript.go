@@ -127,7 +127,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			}
 			for _, connSend := range cm.connections {
 				if connSend != conn && connSend.Exists(channel) {
-					conn.SendRaw(dataRaw)
+					connSend.SendRaw(dataRaw)
 				}
 			}
 			if cm.channels_internal[channel] != nil {
