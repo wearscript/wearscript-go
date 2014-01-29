@@ -94,6 +94,9 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			// TODO: How do we kill this off?
 			err := msgcodec.Receive(conn.ws, &request)
 			if err != nil {
+				// On disconnect:
+				// 1. Remove from connections
+				// 2. Send out empty subscriptions for devices behind it
 				fmt.Println("ws: from glass")
 				connections := []*Connection{}
 				for _, connection := range cm.connections {
@@ -102,6 +105,9 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				cm.connections = connections
+				for group_device, _ := range conn.device_to_channels {
+					cm.Publish("subscriptions", group_device, []string{})
+				}
 				break
 			}
 			dataRaw := request[0].([]byte)
