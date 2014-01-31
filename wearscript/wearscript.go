@@ -62,7 +62,7 @@ type Connection struct {
 }
 
 type ConnectionManager struct {
-	connections                 []*Connection
+	connections                 *[]*Connection
 	group, device, group_device string
 	channels_internal           map[string]func(string, []byte, []interface{})
 	lock                        *sync.Mutex
@@ -70,7 +70,7 @@ type ConnectionManager struct {
 
 func ConnectionManagerFactory(group, device string) (*ConnectionManager, error) {
 	cm := &ConnectionManager{}
-	cm.connections = []*Connection{}
+	cm.connections = &[]*Connection{}
 	cm.group = group
 	cm.device = device
 	cm.group_device = cm.group + ":" + cm.device
@@ -85,7 +85,8 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	conn.device_to_channels = &map[string][]string{}
 	conn.channels_external = &map[string]bool{}
 	conn.lock = &sync.Mutex{}
-	cm.connections = append(cm.connections, conn)
+	connections := append(*cm.connections, conn)
+	cm.connections = &connections
 	fmt.Println(cm.connections)
 	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
 	fmt.Println("New conn")
@@ -100,13 +101,13 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 				// 1. Remove from connections
 				// 2. Send out empty subscriptions for devices behind it
 				fmt.Println("ws: from glass")
-				connections := []*Connection{}
-				for _, connection := range cm.connections {
+				connections = []*Connection{}
+				for _, connection := range *cm.connections {
 					if connection != conn {
 						connections = append(connections, connection)
 					}
 				}
-				cm.connections = connections
+				cm.connections = &connections
 				for group_device, _ := range *conn.device_to_channels {
 					cm.Publish("subscriptions", group_device, []string{})
 				}
@@ -136,7 +137,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 				conn.lock.Unlock()
 
 			}
-			for _, connSend := range cm.connections {
+			for _, connSend := range *cm.connections {
 				if connSend != conn && connSend.Exists(channel) {
 					connSend.SendRaw(dataRaw)
 				}
@@ -151,7 +152,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	if len(cm.channels_internal) > 0 {
 		cm.Publish("subscriptions", cm.group_device, cm.ChannelsInternal())
 	}
-	for _, conn := range cm.connections {
+	for _, conn := range *cm.connections {
 		for k, v := range *conn.device_to_channels {
 			if len(v) > 0 {
 				cm.Publish("subscriptions", k, v)
@@ -195,7 +196,7 @@ func (cm *ConnectionManager) Unsubscribe(channel string) {
 }
 
 func (cm *ConnectionManager) Publish(channel string, data ...interface{}) {
-	for _, conn := range cm.connections {
+	for _, conn := range *cm.connections {
 		if !conn.Exists(channel) {
 			return
 		}
