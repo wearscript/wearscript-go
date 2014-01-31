@@ -140,6 +140,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					connSend.SendRaw(dataRaw)
 				}
 			}
+			// BUG(brandyn): This should use the soft matching like Exists
 			if cm.channels_internal[channel] != nil {
 				cm.channels_internal[channel](channel, dataRaw, *data)
 			}
@@ -207,7 +208,9 @@ func (conn *Connection) Exists(channel string) bool {
 	}
 	splits := strings.Split(channel, ":")
 	channelCur := ""
+	fmt.Println(conn.channels_external)
 	for _, v := range splits {
+		fmt.Println("ExistCheck:" + channelCur)
 		if conn.channels_external[channelCur] {
 			fmt.Println("Exists: " + channelCur)
 			return true
@@ -218,6 +221,7 @@ func (conn *Connection) Exists(channel string) bool {
 			channelCur += ":" + v
 		}
 	}
+	fmt.Println("ExistCheck:" + channelCur)
 	if  conn.channels_external[channelCur] {
 		fmt.Println("Exists: " + channelCur)
 	}
