@@ -132,6 +132,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				conn.channels_external = channels_external
+				fmt.Println(conn.channels_external)
 				conn.lock.Unlock()
 
 			}
