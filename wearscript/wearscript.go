@@ -56,8 +56,8 @@ func msgpackUnmarshal(data []byte, payloadType byte, v interface{}) (err error) 
 
 type Connection struct {
 	ws                 *websocket.Conn
-	device_to_channels map[string][]string
-	channels_external  map[string]bool
+	device_to_channels *map[string][]string
+	channels_external  *map[string]bool
 	lock               *sync.Mutex
 }
 
@@ -82,8 +82,8 @@ func ConnectionManagerFactory(group, device string) (*ConnectionManager, error) 
 func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, error) {
 	conn := &Connection{}
 	conn.ws = ws
-	conn.device_to_channels = map[string][]string{}
-	conn.channels_external = map[string]bool{}
+	conn.device_to_channels = &map[string][]string{}
+	conn.channels_external = &map[string]bool{}
 	conn.lock = &sync.Mutex{}
 	cm.connections = append(cm.connections, conn)
 	fmt.Println(cm.connections)
@@ -107,7 +107,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				cm.connections = connections
-				for group_device, _ := range conn.device_to_channels {
+				for group_device, _ := range *conn.device_to_channels {
 					cm.Publish("subscriptions", group_device, []string{})
 				}
 				break
@@ -123,16 +123,16 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 				for _, c := range (*data)[2].([]interface{}) {
 					channels = append(channels, c.(string))
 				}
-				conn.device_to_channels[groupDevice] = channels
+				(*conn.device_to_channels)[groupDevice] = channels
 				// Update channels
-				channels_external := map[string]bool{}
-				for _, cs := range conn.device_to_channels {
+				channels_external := &map[string]bool{}
+				for _, cs := range *conn.device_to_channels {
 					for _, c := range cs {
-						channels_external[c] = true
+						(*channels_external)[c] = true
 					}
 				}
 				conn.channels_external = channels_external
-				fmt.Println(conn.channels_external)
+				fmt.Println(*conn.channels_external)
 				conn.lock.Unlock()
 
 			}
@@ -152,7 +152,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 		cm.Publish("subscriptions", cm.group_device, cm.ChannelsInternal())
 	}
 	for _, conn := range cm.connections {
-		for k, v := range conn.device_to_channels {
+		for k, v := range *conn.device_to_channels {
 			if len(v) > 0 {
 				cm.Publish("subscriptions", k, v)
 			}
@@ -209,10 +209,10 @@ func (conn *Connection) Exists(channel string) bool {
 	}
 	splits := strings.Split(channel, ":")
 	channelCur := ""
-	fmt.Println(conn.channels_external)
+	fmt.Println(*conn.channels_external)
 	for _, v := range splits {
 		fmt.Println("ExistCheck:" + channelCur)
-		if conn.channels_external[channelCur] {
+		if (*conn.channels_external)[channelCur] {
 			fmt.Println("Exists: " + channelCur)
 			return true
 		}
@@ -223,10 +223,10 @@ func (conn *Connection) Exists(channel string) bool {
 		}
 	}
 	fmt.Println("ExistCheck:" + channelCur)
-	if  conn.channels_external[channelCur] {
+	if (*conn.channels_external)[channelCur] {
 		fmt.Println("Exists: " + channelCur)
 	}
-	return conn.channels_external[channelCur]
+	return (*conn.channels_external)[channelCur]
 }
 
 func (cm *ConnectionManager) Channel(parts ...string) string {
@@ -263,5 +263,5 @@ func (cm *ConnectionManager) ChannelsInternal() []string {
 }
 
 func (conn *Connection) ChannelsExternal() map[string][]string {
-	return conn.device_to_channels
+	return *conn.device_to_channels
 }
