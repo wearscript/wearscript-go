@@ -58,14 +58,14 @@ type Connection struct {
 	ws                 *websocket.Conn
 	device_to_channels map[string][]string
 	channels_external  map[string]bool
-	lock               sync.Mutex
+	lock               *sync.Mutex
 }
 
 type ConnectionManager struct {
 	connections                 []*Connection
 	group, device, group_device string
 	channels_internal           map[string]func(string, []byte, []interface{})
-	lock                        sync.Mutex
+	lock                        *sync.Mutex
 }
 
 func ConnectionManagerFactory(group, device string) (*ConnectionManager, error) {
@@ -75,6 +75,7 @@ func ConnectionManagerFactory(group, device string) (*ConnectionManager, error) 
 	cm.device = device
 	cm.group_device = cm.group + ":" + cm.device
 	cm.channels_internal = map[string]func(string, []byte, []interface{}){}
+	cm.lock = &sync.Mutex{}
 	return cm, nil
 }
 
@@ -83,6 +84,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	conn.ws = ws
 	conn.device_to_channels = map[string][]string{}
 	conn.channels_external = map[string]bool{}
+	conn.lock = &sync.Mutex{}
 	cm.connections = append(cm.connections, conn)
 	fmt.Println(cm.connections)
 	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
@@ -115,6 +117,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			channel := (*data)[0].(string)
 			fmt.Println(data)
 			if channel == "subscriptions" {
+				conn.lock.Lock()
 				groupDevice := (*data)[1].(string)
 				channels := []string{}
 				for _, c := range (*data)[2].([]interface{}) {
@@ -129,6 +132,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				conn.channels_external = channels_external
+				conn.lock.Unlock()
 
 			}
 			for _, connSend := range cm.connections {
@@ -204,8 +208,8 @@ func (conn *Connection) Exists(channel string) bool {
 	splits := strings.Split(channel, ":")
 	channelCur := ""
 	for _, v := range splits {
-		fmt.Println("Exists: " + channelCur)
 		if conn.channels_external[channelCur] {
+			fmt.Println("Exists: " + channelCur)
 			return true
 		}
 		if channelCur == "" {
@@ -213,6 +217,9 @@ func (conn *Connection) Exists(channel string) bool {
 		} else {
 			channelCur += ":" + v
 		}
+	}
+	if  conn.channels_external[channelCur] {
+		fmt.Println("Exists: " + channelCur)
 	}
 	return conn.channels_external[channelCur]
 }
@@ -223,7 +230,7 @@ func (cm *ConnectionManager) Channel(parts ...string) string {
 
 func (cm *ConnectionManager) Subchannel(part string) string {
 	// TODO(brandyn): Extend
-	return strings.Join([]string{cm.group_device, part}, ":")
+	return strings.Join([]string{part, cm.group_device}, ":")
 }
 
 func (cm *ConnectionManager) Ackchannel(channel string) string {
