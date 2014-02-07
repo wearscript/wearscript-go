@@ -41,12 +41,12 @@ func msgpackUnmarshal(data []byte, payloadType byte, v interface{}) (err error) 
 	dec := codec.NewDecoderBytes(data, &mh)
 	*w = append(*w, data)
 	*w = append(*w, &[]interface{}{})
-	fmt.Println(w)
+	//fmt.Println(w)
 	err = dec.Decode(&((*w)[1]))
-	fmt.Println(w)
+	//fmt.Println(w)
 	x := ((*w)[1]).(*[]interface{})
 	msgpackConvert(x)
-	fmt.Println(*x)
+	//fmt.Println(*x)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -116,7 +116,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			dataRaw := request[0].([]byte)
 			data := request[1].(*[]interface{})
 			channel := (*data)[0].(string)
-			fmt.Println(data)
+			//fmt.Println(data)
 			if channel == "subscriptions" {
 				conn.lock.Lock()
 				groupDevice := (*data)[1].(string)
@@ -159,7 +159,6 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			}
 		}
 	}
-	fmt.Println("After")
 	return conn, nil
 }
 
@@ -210,11 +209,9 @@ func (conn *Connection) Exists(channel string) bool {
 	}
 	splits := strings.Split(channel, ":")
 	channelCur := ""
-	fmt.Println(*conn.channels_external)
+	//fmt.Println(*conn.channels_external)
 	for _, v := range splits {
-		fmt.Println("ExistCheck:" + channelCur)
 		if (*conn.channels_external)[channelCur] {
-			fmt.Println("Exists: " + channelCur)
 			return true
 		}
 		if channelCur == "" {
@@ -222,10 +219,6 @@ func (conn *Connection) Exists(channel string) bool {
 		} else {
 			channelCur += ":" + v
 		}
-	}
-	fmt.Println("ExistCheck:" + channelCur)
-	if (*conn.channels_external)[channelCur] {
-		fmt.Println("Exists: " + channelCur)
 	}
 	return (*conn.channels_external)[channelCur]
 }
