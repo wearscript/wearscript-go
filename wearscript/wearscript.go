@@ -92,7 +92,6 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	fmt.Println("New conn")
 	go func() {
 		for {
-			fmt.Println("Receive")
 			request := []interface{}{}
 			// TODO: How do we kill this off?
 			err := msgcodec.Receive(conn.ws, &request)
@@ -116,6 +115,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			dataRaw := request[0].([]byte)
 			data := request[1].(*[]interface{})
 			channel := (*data)[0].(string)
+			fmt.Println("Receive: " + channel)
 			//fmt.Println(data)
 			if channel == "subscriptions" {
 				conn.lock.Lock()
