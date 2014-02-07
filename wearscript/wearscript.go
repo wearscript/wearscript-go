@@ -212,7 +212,7 @@ func (conn *Connection) Exists(channel string) bool {
 	}
 	splits := strings.Split(channel, ":")
 	channelCur := ""
-	//fmt.Println(*conn.channels_external)
+	fmt.Println(*conn.channels_external)
 	for _, v := range splits {
 		if (*conn.channels_external)[channelCur] {
 			return true
