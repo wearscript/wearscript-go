@@ -118,6 +118,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			fmt.Println("Receive: " + channel)
 			//fmt.Println(data)
 			if channel == "subscriptions" {
+				fmt.Println(data)
 				conn.lock.Lock()
 				groupDevice := (*data)[1].(string)
 				channels := []string{}
