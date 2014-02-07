@@ -195,10 +195,12 @@ func (cm *ConnectionManager) Unsubscribe(channel string) {
 }
 
 func (cm *ConnectionManager) Publish(channel string, data ...interface{}) {
+	fmt.Println("Publish: " + channel)
 	for _, conn := range *cm.connections {
 		if !conn.Exists(channel) {
 			return
 		}
+		fmt.Println("Publish: " + channel + " Sending")
 		conn.Send(append([]interface{}{channel}, data...)...)
 	}
 }
