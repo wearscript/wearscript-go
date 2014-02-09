@@ -140,6 +140,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			}
 			for _, connSend := range *cm.connections {
 				if connSend != conn && connSend.Exists(channel) {
+					fmt.Println("Forwarding: " + channel)
 					connSend.SendRaw(dataRaw)
 				}
 			}
