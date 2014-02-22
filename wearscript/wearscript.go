@@ -41,16 +41,12 @@ func msgpackUnmarshal(data []byte, payloadType byte, v interface{}) (err error) 
 	dec := codec.NewDecoderBytes(data, &mh)
 	*w = append(*w, data)
 	*w = append(*w, &[]interface{}{})
-	//fmt.Println(w)
 	err = dec.Decode(&((*w)[1]))
-	//fmt.Println(w)
 	x := ((*w)[1]).(*[]interface{})
 	msgpackConvert(x)
-	//fmt.Println(*x)
 	if err != nil {
 		fmt.Println(err)
 	}
-	//fmt.Println("Unmarshal: " + B64Enc(string(data)))
 	return
 }
 
@@ -79,14 +75,24 @@ func ConnectionManagerFactory(group, device string) (*ConnectionManager, error) 
 	return cm, nil
 }
 
+func (cm *ConnectionManager) Lock() {
+	cm.lock.Lock()
+}
+
+func (cm *ConnectionManager) Unlock() {
+	cm.lock.Unlock()
+}
+
 func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, error) {
 	conn := &Connection{}
 	conn.ws = ws
 	conn.device_to_channels = &map[string][]string{}
 	conn.channels_external = &map[string]bool{}
 	conn.lock = &sync.Mutex{}
+	cm.Lock()
 	connections := append(*cm.connections, conn)
 	cm.connections = &connections
+	cm.Unlock()
 	fmt.Println(cm.connections)
 	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
 	fmt.Println("New conn")
@@ -101,12 +107,14 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 				// 2. Send out empty subscriptions for devices behind it
 				fmt.Println("ws: from glass")
 				connections = []*Connection{}
+				cm.Lock()
 				for _, connection := range *cm.connections {
 					if connection != conn {
 						connections = append(connections, connection)
 					}
 				}
 				cm.connections = &connections
+				cm.Unlock()
 				for group_device, _ := range *conn.device_to_channels {
 					cm.Publish("subscriptions", group_device, []string{})
 				}
@@ -145,15 +153,20 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 				}
 			}
 			// BUG(brandyn): This should use the soft matching like Exists
+			// TODO(brandyn): Extract the callback and unlock, then call it
+			cm.Lock()
 			if cm.channels_internal[channel] != nil {
 				cm.channels_internal[channel](channel, dataRaw, *data)
 			}
+			cm.Unlock()
 		}
 	}()
 	// Send this and all other devices to the new client
+	cm.Lock()
 	if len(cm.channels_internal) > 0 {
 		conn.Send("subscriptions", cm.group_device, cm.ChannelsInternal())
 	}
+	cm.Unlock()
 	for _, connPrev := range *cm.connections {
 		for k, v := range *connPrev.device_to_channels {
 			if len(v) > 0 {
@@ -165,11 +178,12 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 }
 
 func (cm *ConnectionManager) Subscribe(channel string, callback func(string, []byte, []interface{})) {
-	if cm.channels_internal[channel] == nil {
-		cm.channels_internal[channel] = callback
+	cm.Lock()
+	publish := cm.channels_internal[channel] == nil
+	cm.channels_internal[channel] = callback
+	cm.Unlock()
+	if publish {
 		cm.Publish("subscriptions", cm.group_device, cm.ChannelsInternal())
-	} else {
-		cm.channels_internal[channel] = callback
 	}
 }
 
@@ -190,8 +204,11 @@ func (conn *Connection) SendRaw(data []byte) {
 }
 
 func (cm *ConnectionManager) Unsubscribe(channel string) {
-	if cm.channels_internal[channel] != nil {
-		delete(cm.channels_internal, channel)
+	cm.Lock()
+	publish := cm.channels_internal[channel] != nil
+	delete(cm.channels_internal, channel)
+	cm.Unlock()
+	if publish {
 		cm.Publish("subscriptions", cm.group_device, cm.ChannelsInternal())
 	}
 }
@@ -213,6 +230,8 @@ func (conn *Connection) Exists(channel string) bool {
 	}
 	splits := strings.Split(channel, ":")
 	channelCur := ""
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 	fmt.Println(*conn.channels_external)
 	for _, v := range splits {
 		if (*conn.channels_external)[channelCur] {
@@ -253,10 +272,12 @@ func (cm *ConnectionManager) GroupDevice() string {
 }
 
 func (cm *ConnectionManager) ChannelsInternal() []string {
+	cm.Lock()
 	out := make([]string, 0, len(cm.channels_internal))
 	for k, _ := range cm.channels_internal {
 		out = append(out, k)
 	}
+	cm.Unlock()
 	return out
 }
 
