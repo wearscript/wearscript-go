@@ -162,11 +162,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 		}
 	}()
 	// Send this and all other devices to the new client
-	cm.Lock()
-	if len(cm.channels_internal) > 0 {
-		conn.Send("subscriptions", cm.group_device, cm.ChannelsInternal())
-	}
-	cm.Unlock()
+	conn.Send("subscriptions", cm.group_device, cm.ChannelsInternal())
 	for _, connPrev := range *cm.connections {
 		for k, v := range *connPrev.device_to_channels {
 			if len(v) > 0 {
