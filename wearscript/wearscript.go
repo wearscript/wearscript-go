@@ -142,7 +142,6 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					}
 				}
 				conn.channels_external = channels_external
-				fmt.Println(*conn.channels_external)
 				conn.lock.Unlock()
 
 			}
@@ -155,10 +154,12 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			// BUG(brandyn): This should use the soft matching like Exists
 			// TODO(brandyn): Extract the callback and unlock, then call it
 			cm.Lock()
-			if cm.channels_internal[channel] != nil {
-				cm.channels_internal[channel](channel, dataRaw, *data)
-			}
+			callback := cm.channels_internal[channel]
 			cm.Unlock()
+			if  callback != nil {
+				callback(channel, dataRaw, *data)
+			}
+
 		}
 	}()
 	// Send this and all other devices to the new client
