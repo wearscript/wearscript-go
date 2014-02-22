@@ -156,7 +156,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 			cm.Lock()
 			callback := cm.channels_internal[channel]
 			cm.Unlock()
-			if  callback != nil {
+			if callback != nil {
 				callback(channel, dataRaw, *data)
 			}
 
@@ -208,6 +208,15 @@ func (cm *ConnectionManager) Unsubscribe(channel string) {
 	if publish {
 		cm.Publish("subscriptions", cm.group_device, cm.ChannelsInternal())
 	}
+}
+
+func (cm *ConnectionManager) Exists(channel string) bool {
+	for _, conn := range *cm.connections {
+		if conn.Exists(channel) {
+			return true
+		}
+	}
+	return false
 }
 
 func (cm *ConnectionManager) Publish(channel string, data ...interface{}) {
@@ -278,6 +287,81 @@ func (cm *ConnectionManager) ChannelsInternal() []string {
 	return out
 }
 
+func (cm *ConnectionManager) ChannelsExternal() map[string][]string {
+	channelsExternal := map[string][]string{}
+	for _, conn := range *cm.connections {
+		for k, v := range conn.ChannelsExternal() {
+			channelsExternal[k] = v
+		}
+	}
+	return channelsExternal
+}
+
 func (conn *Connection) ChannelsExternal() map[string][]string {
 	return *conn.device_to_channels
+}
+
+func (cm *ConnectionManager) SubscribeTestHandler() {
+	var callback func(string, []byte, []interface{})
+	callback = func(channel string, dataRaw []byte, data []interface{}) {
+		command, ok := data[1].(string)
+		if !ok {
+			return
+		}
+		channelArg, ok := data[2].(string)
+		if !ok {
+			return
+		}
+		switch command {
+		case "subscribe":
+			cm.Subscribe(channelArg, callback)
+		case "unsubscribe":
+			cm.Unsubscribe(channelArg)
+		case "channelsInternal":
+			cm.Publish(channelArg, cm.ChannelsInternal())
+		case "channelsExternal":
+			cm.Publish(channelArg, cm.ChannelsExternal())
+		case "group":
+			cm.Publish(channelArg, cm.Group())
+		case "device":
+			cm.Publish(channelArg, cm.Device())
+		case "groupDevice":
+			cm.Publish(channelArg, cm.GroupDevice())
+		case "exists":
+			channelExists, ok := data[3].(string)
+			if !ok {
+				fmt.Println("TestError[exists]: bad channel")
+				return
+			}
+			cm.Publish(channelArg, cm.Exists(channelExists))
+		case "publish":
+			cm.Publish(channelArg, data[3:]...)
+		case "channel":
+			channelParts := []string{}
+			for _, v := range data[3:] {
+				channelPart, ok := v.(string)
+				if !ok {
+					fmt.Println("TestError[channel]: bad part")
+					return
+				}
+				channelParts = append(channelParts, channelPart)
+			}
+			cm.Publish(channelArg, cm.Channel(channelParts...))
+		case "subchannel":
+			channelParam, ok := data[3].(string)
+			if !ok {
+				fmt.Println("TestError[subchannel]: bad param")
+				return
+			}
+			cm.Publish(channelArg, cm.Subchannel(channelParam))
+		case "ackchannel":
+			channelParam, ok := data[3].(string)
+			if !ok {
+				fmt.Println("TestError[subchannel]: bad param")
+				return
+			}
+			cm.Publish(channelArg, cm.Ackchannel(channelParam))
+		}
+	}
+	cm.Subscribe("test:"+cm.group_device, callback)
 }
