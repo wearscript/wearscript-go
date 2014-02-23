@@ -151,15 +151,10 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 					connSend.SendRaw(dataRaw)
 				}
 			}
-			// BUG(brandyn): This should use the soft matching like Exists
-			// TODO(brandyn): Extract the callback and unlock, then call it
-			cm.Lock()
-			callback := cm.channels_internal[channel]
-			cm.Unlock()
+			callback := cm.existsInternal(channel)
 			if callback != nil {
 				callback(channel, dataRaw, *data)
 			}
-
 		}
 	}()
 	// Send this and all other devices to the new client
@@ -217,6 +212,24 @@ func (cm *ConnectionManager) Exists(channel string) bool {
 		}
 	}
 	return false
+}
+
+func (cm *ConnectionManager) existsInternal(channel string) func(string, []byte, []interface{}) {
+	splits := strings.Split(channel, ":")
+	channelCur := ""
+	cm.Lock()
+	defer cm.Unlock()
+	for _, v := range splits {
+		if cm.channels_internal[channelCur] != nil {
+			return cm.channels_internal[channelCur]
+		}
+		if channelCur == "" {
+			channelCur += v
+		} else {
+			channelCur += ":" + v
+		}
+	}
+	return cm.channels_internal[channelCur]
 }
 
 func (cm *ConnectionManager) Publish(channel string, data ...interface{}) {
