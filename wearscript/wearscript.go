@@ -94,68 +94,9 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	cm.connections = &connections
 	cm.Unlock()
 	fmt.Println(cm.connections)
-	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
 	fmt.Println("New conn")
 	go func() {
-		for {
-			request := []interface{}{}
-			// TODO: How do we kill this off?
-			err := msgcodec.Receive(conn.ws, &request)
-			if err != nil {
-				// On disconnect:
-				// 1. Remove from connections
-				// 2. Send out empty subscriptions for devices behind it
-				fmt.Println("ws: from glass")
-				connections = []*Connection{}
-				cm.Lock()
-				for _, connection := range *cm.connections {
-					if connection != conn {
-						connections = append(connections, connection)
-					}
-				}
-				cm.connections = &connections
-				cm.Unlock()
-				for group_device, _ := range *conn.device_to_channels {
-					cm.Publish("subscriptions", group_device, []string{})
-				}
-				break
-			}
-			dataRaw := request[0].([]byte)
-			data := request[1].(*[]interface{})
-			channel := (*data)[0].(string)
-			fmt.Println("Receive: " + channel)
-			//fmt.Println(data)
-			if channel == "subscriptions" {
-				fmt.Println(data)
-				conn.lock.Lock()
-				groupDevice := (*data)[1].(string)
-				channels := []string{}
-				for _, c := range (*data)[2].([]interface{}) {
-					channels = append(channels, c.(string))
-				}
-				(*conn.device_to_channels)[groupDevice] = channels
-				// Update channels
-				channels_external := &map[string]bool{}
-				for _, cs := range *conn.device_to_channels {
-					for _, c := range cs {
-						(*channels_external)[c] = true
-					}
-				}
-				conn.channels_external = channels_external
-				conn.lock.Unlock()
 
-			}
-			for _, connSend := range *cm.connections {
-				if connSend != conn && connSend.Exists(channel) {
-					fmt.Println("Forwarding: " + channel)
-					connSend.SendRaw(dataRaw)
-				}
-			}
-			callback := cm.existsInternal(channel)
-			if callback != nil {
-				callback(channel, dataRaw, *data)
-			}
-		}
 	}()
 	// Send this and all other devices to the new client
 	conn.Send("subscriptions", cm.group_device, cm.ChannelsInternal())
@@ -167,6 +108,69 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 		}
 	}
 	return conn, nil
+}
+
+func (cm *ConnectionManager) HandlerLoop(conn *Connection) {
+	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
+	for {
+		request := []interface{}{}
+		// TODO: How do we kill this off?
+		err := msgcodec.Receive(conn.ws, &request)
+		if err != nil {
+			// On disconnect:
+			// 1. Remove from connections
+			// 2. Send out empty subscriptions for devices behind it
+			fmt.Println("ws: from glass")
+			connections := []*Connection{}
+			cm.Lock()
+			for _, connection := range *cm.connections {
+				if connection != conn {
+					connections = append(connections, connection)
+				}
+			}
+			cm.connections = &connections
+			cm.Unlock()
+			for group_device, _ := range *conn.device_to_channels {
+				cm.Publish("subscriptions", group_device, []string{})
+			}
+			break
+		}
+		dataRaw := request[0].([]byte)
+		data := request[1].(*[]interface{})
+		channel := (*data)[0].(string)
+		fmt.Println("Receive: " + channel)
+		//fmt.Println(data)
+		if channel == "subscriptions" {
+			fmt.Println(data)
+			conn.lock.Lock()
+			groupDevice := (*data)[1].(string)
+			channels := []string{}
+			for _, c := range (*data)[2].([]interface{}) {
+				channels = append(channels, c.(string))
+			}
+			(*conn.device_to_channels)[groupDevice] = channels
+			// Update channels
+			channels_external := &map[string]bool{}
+			for _, cs := range *conn.device_to_channels {
+				for _, c := range cs {
+					(*channels_external)[c] = true
+				}
+			}
+			conn.channels_external = channels_external
+			conn.lock.Unlock()
+
+		}
+		for _, connSend := range *cm.connections {
+			if connSend != conn && connSend.Exists(channel) {
+				fmt.Println("Forwarding: " + channel)
+				connSend.SendRaw(dataRaw)
+			}
+		}
+		callback := cm.existsInternal(channel)
+		if callback != nil {
+			callback(channel, dataRaw, *data)
+		}
+	}
 }
 
 func (cm *ConnectionManager) Subscribe(channel string, callback func(string, []byte, []interface{})) {
