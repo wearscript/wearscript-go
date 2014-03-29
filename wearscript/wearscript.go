@@ -95,9 +95,6 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 	cm.Unlock()
 	fmt.Println(cm.connections)
 	fmt.Println("New conn")
-	go func() {
-
-	}()
 	// Send this and all other devices to the new client
 	conn.Send("subscriptions", cm.group_device, cm.ChannelsInternal())
 	for _, connPrev := range *cm.connections {
@@ -112,6 +109,7 @@ func (cm *ConnectionManager) NewConnection(ws *websocket.Conn) (*Connection, err
 
 func (cm *ConnectionManager) HandlerLoop(conn *Connection) {
 	msgcodec := websocket.Codec{msgpackMarshal, msgpackUnmarshal}
+	fmt.Println("In handler loop")
 	for {
 		request := []interface{}{}
 		// TODO: How do we kill this off?
@@ -171,6 +169,7 @@ func (cm *ConnectionManager) HandlerLoop(conn *Connection) {
 			callback(channel, dataRaw, *data)
 		}
 	}
+	fmt.Println("exiting loop")
 }
 
 func (cm *ConnectionManager) Subscribe(channel string, callback func(string, []byte, []interface{})) {
